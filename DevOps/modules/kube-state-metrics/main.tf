@@ -1,49 +1,35 @@
-/*
-  NOTE: Using `kubernetes_manifest` resource due to a bug in the terraform provider. Details can be found here:
-  https://github.com/hashicorp/terraform-provider-kubernetes/issues/1724#issuecomment-1139450178
-*/
 resource "kubernetes_manifest" "state_metrics_local_sa" {
-  provider = kubernetes.local
-
   manifest = {
     apiVersion = "v1"
     kind       = "ServiceAccount"
     metadata = {
-      namespace = kubernetes_namespace.mon_local.metadata[0].name
-      name      = "state-metrics"
+      namespace = var.namespace
+      name      = var.name
 
-      labels = {
-        app = "state-metrics"
-      }
+      labels = local.labels
+
     }
-
     automountServiceAccountToken = false
   }
 }
 
 resource "kubernetes_secret" "state_metrics_local_sa_token" {
-  provider = kubernetes.local
-
   metadata {
     name      = "state-metrics-token"
-    namespace = kubernetes_namespace.mon_local.metadata[0].name
+    namespace = var.namespace
     annotations = {
       "kubernetes.io/service-account.name" = kubernetes_manifest.state_metrics_local_sa.manifest.metadata.name
     }
   }
-
   type = "kubernetes.io/service-account-token"
 }
 
 resource "kubernetes_cluster_role" "state_metrics_local" {
-  provider = kubernetes.local
-
   metadata {
-    name = "state-metrics"
+    name = var.name
 
-    labels = {
-      app = "state-metrics"
-    }
+    labels = local.labels
+    
   }
 
   rule {
@@ -139,14 +125,11 @@ resource "kubernetes_cluster_role" "state_metrics_local" {
 }
 
 resource "kubernetes_cluster_role_binding" "state_metrics_local" {
-  provider = kubernetes.local
 
   metadata {
     name = "state-metrics-binding"
 
-    labels = {
-      app = "state-metrics"
-    }
+    labels = local.labels
   }
 
   role_ref {
@@ -158,25 +141,22 @@ resource "kubernetes_cluster_role_binding" "state_metrics_local" {
   subject {
     kind      = "ServiceAccount"
     name      = kubernetes_manifest.state_metrics_local_sa.manifest.metadata.name
-    namespace = kubernetes_namespace.mon_local.metadata[0].name
+    namespace = var.namespace
     api_group = ""
   }
 }
 
 resource "kubernetes_deployment" "state_metrics_local" {
-  provider = kubernetes.local
 
   metadata {
-    name      = "state-metrics"
-    namespace = kubernetes_namespace.mon_local.metadata[0].name
+    name      = var.name
+    namespace = var.namespace
 
-    labels = {
-      app = "state-metrics"
-    }
+    labels = local.labels
   }
 
   spec {
-    replicas = 1
+    replicas = var.replicas
 
     strategy {
       type = "Recreate"
@@ -192,7 +172,7 @@ resource "kubernetes_deployment" "state_metrics_local" {
 
     template {
       metadata {
-        namespace = kubernetes_namespace.mon_local.metadata[0].name
+        namespace = var.namespace
         labels = {
           app = "state-metrics"
         }
